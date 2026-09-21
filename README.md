@@ -8,18 +8,22 @@
 
 - 起点为 `(0, 0)`，目标为 `(5, 5)`，状态表示为 `[x, y, x_g, y_g]`。
 - 动作为 `up / down / left / right`，每步在二维整数网格中移动一格。
-- 默认奖励为当前位置到目标的负欧氏距离：$r=-\sqrt{(x-x_g)^2+(y-y_g)^2}$；到达目标时奖励改为 `100`。
+- 默认奖励为当前位置到目标的负欧氏距离：`r = -√((x - x_g)² + (y - y_g)²)`；到达目标时奖励改为 `100`。
 - 每个 episode 最多执行 `100` 步。环境使用固定起点和固定目标，没有空间边界，也不包含真实 UAV 动力学。
 
 ## Q-learning
 
 智能体使用表格型 Q-learning，更新规则为：
 
-$$
-Q(s,a) \leftarrow Q(s,a)+\alpha\left[r+\gamma\max_{a'}Q(s',a')-Q(s,a)\right]
-$$
+`Q(s, a) ← Q(s, a) + α[r + γ max Q(s′, a′) − Q(s, a)]`
 
-超参数为 `alpha=0.1`、`gamma=0.9`、`epsilon=0.3`。训练阶段采用 ε-greedy 策略，即以 30% 概率随机探索；测试阶段使用纯 greedy policy，并关闭学习更新。
+超参数为：
+
+- `α = 0.1`
+- `γ = 0.9`
+- `ε = 0.3`
+
+训练阶段采用 ε-greedy 策略，即以 30% 概率随机探索；测试阶段使用纯 greedy policy，并关闭学习更新。
 
 ## 实验设计
 
@@ -34,7 +38,7 @@ Training 与 Evaluation 相互分离：训练阶段更新 Q-table；评估阶段
 | 100 | False | 100 | -626.84 | 6.32 | 进入 `(-1,3) ↔ (-1,4)` 周期振荡 |
 | 500 | True | 10 | 67.11 | 0 | 到达 `(5,5)` |
 
-从 `(0,0)` 到 `(5,5)`，四方向单步移动至少需要 $|5|+|5|=10$ 步，因此 500-episode 策略在当前动作模型下达到最短路径。
+从 `(0,0)` 到 `(5,5)`，四方向单步移动至少需要 `|5| + |5| = 10` 步，因此 500-episode 策略在当前动作模型下达到最短路径。
 
 根目录的旧版 `q_table.pkl` 同样来自 100 episodes 训练，但当时没有固定随机种子。当前 greedy 评估中，该策略在 `(0,0) ↔ (1,0)` 之间振荡并最终失败。两次 100-episode 实验形成不同失败策略，说明训练轮数有限时，结果仍会受到 ε-greedy 随机探索历史的影响。
 
@@ -62,10 +66,29 @@ Training 与 Evaluation 相互分离：训练阶段更新 Q-table；评估阶段
 
 ## 可视化
 
-- [Reward curve](results/reward_curve_500_episodes_seed_0.png)：展示单回合 reward 与 50-episode 移动平均。
-- [Steps curve](results/steps_curve_500_episodes_seed_0.png)：展示单回合步数与 50-episode 移动平均。
-- [Success rate curve](results/success_rate_curve_500_episodes_seed_0.png)：展示 50-episode 滚动成功率。
-- [100 vs 500 trajectory GIF](results/trajectory_comparison_seed_0.gif)：直观对比 100 episodes 的振荡失败与 500 episodes 的 10 步成功轨迹。
+### 训练轨迹对比
+
+直观对比 100 episodes 的振荡失败与 500 episodes 的 10 步成功轨迹。
+
+![100 vs 500 episodes trajectory comparison](results/trajectory_comparison_seed_0.gif)
+
+### Reward
+
+展示单回合 reward 与 50-episode 移动平均。
+
+![Reward curve](results/reward_curve_500_episodes_seed_0.png)
+
+### Steps
+
+展示单回合步数与 50-episode 移动平均。
+
+![Steps curve](results/steps_curve_500_episodes_seed_0.png)
+
+### Success Rate
+
+展示 50-episode 滚动成功率。
+
+![Success rate curve](results/success_rate_curve_500_episodes_seed_0.png)
 
 ## 当前结论与局限
 
