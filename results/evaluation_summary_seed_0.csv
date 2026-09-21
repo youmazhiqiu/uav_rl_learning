@@ -1,0 +1,3 @@
+training_episodes,seed,success,steps,total_reward,final_distance,training_metrics_file,trajectory_file,q_table_file
+100,0,False,100,-626.8404459461877,6.324555320336759,results/training_metrics_100_episodes_seed_0.csv,results/trajectory_100_episodes_seed_0.csv,results/q_table_100_episodes_seed_0.pkl
+500,0,True,10,67.10517270509732,0.0,results/training_metrics_500_episodes_seed_0.csv,results/trajectory_500_episodes_seed_0.csv,results/q_table_500_episodes_seed_0.pkl

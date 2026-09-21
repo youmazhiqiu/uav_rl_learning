@@ -1,158 +1,74 @@
-# UAV Reinforcement Learning Learning
+# UAV Reinforcement Learning Baseline
 
 ## 项目简介
 
-本项目是无人系统控制方向的初步学习实验，目标是在阅读多无人机强化学习控制相关论文之前，先搭建一个最小化的无人机强化学习环境，理解强化学习控制系统中的环境建模、状态空间、动作空间、奖励函数以及智能体训练流程。
+这是一个面向无人系统控制与强化学习方向的最小单 UAV Q-learning baseline。项目目标是理解并跑通环境建模、智能体训练、策略评估、指标记录和结果可视化的完整实验流程，为后续研究 DQN、多 UAV、集中训练分散执行（CTDE）及 GNN/GAT 奠定可复现的基线。
 
-当前实验对象为单无人机二维移动任务。无人机作为被控对象，通过与环境交互学习控制策略，使无人机从初始位置移动到目标位置。
+## 问题定义
 
-## 当前完成内容
+- 起点为 `(0, 0)`，目标为 `(5, 5)`，状态表示为 `[x, y, x_g, y_g]`。
+- 动作为 `up / down / left / right`，每步在二维整数网格中移动一格。
+- 默认奖励为当前位置到目标的负欧氏距离：$r=-\sqrt{(x-x_g)^2+(y-y_g)^2}$；到达目标时奖励改为 `100`。
+- 每个 episode 最多执行 `100` 步。环境使用固定起点和固定目标，没有空间边界，也不包含真实 UAV 动力学。
 
-目前已经完成以下模块：
+## Q-learning
 
-1. 无人机环境建模（UAV Environment）
+智能体使用表格型 Q-learning，更新规则为：
 
-建立二维无人机运动环境：
+$$
+Q(s,a) \leftarrow Q(s,a)+\alpha\left[r+\gamma\max_{a'}Q(s',a')-Q(s,a)\right]
+$$
 
-状态变量：
+超参数为 `alpha=0.1`、`gamma=0.9`、`epsilon=0.3`。训练阶段采用 ε-greedy 策略，即以 30% 概率随机探索；测试阶段使用纯 greedy policy，并关闭学习更新。
 
-s = [x, y, x_g, y_g]
+## 实验设计
 
-其中：
+主实验固定 `seed=0`，分别从新智能体开始独立训练 `100` 和 `500` episodes；两次运行使用相同环境、奖励和超参数。CSV 记录验证，500-episode 运行的前 100 episodes 与独立 100-episode 运行逐条完全一致，因此可以将其视为沿相同训练轨迹再学习 400 episodes。
 
-- x, y 表示无人机当前位置；
-- x_g, y_g 表示目标位置。
+Training 与 Evaluation 相互分离：训练阶段更新 Q-table；评估阶段使用已训练的 Q-table，在新环境中关闭探索，以 greedy policy 运行一个 episode，且不更新 Q-table。
 
-控制输入：
+## 实验结果
 
-A = {up, down, left, right}
+| 训练轮数 | Success | Steps | Total reward | Final distance | Greedy policy 表现 |
+| ---: | :---: | ---: | ---: | ---: | --- |
+| 100 | False | 100 | -626.84 | 6.32 | 进入 `(-1,3) ↔ (-1,4)` 周期振荡 |
+| 500 | True | 10 | 67.11 | 0 | 到达 `(5,5)` |
 
-分别表示无人机四个方向的移动。
+从 `(0,0)` 到 `(5,5)`，四方向单步移动至少需要 $|5|+|5|=10$ 步，因此 500-episode 策略在当前动作模型下达到最短路径。
 
-状态转移过程：
+根目录的旧版 `q_table.pkl` 同样来自 100 episodes 训练，但当时没有固定随机种子。当前 greedy 评估中，该策略在 `(0,0) ↔ (1,0)` 之间振荡并最终失败。两次 100-episode 实验形成不同失败策略，说明训练轮数有限时，结果仍会受到 ε-greedy 随机探索历史的影响。
 
-无人机根据当前动作改变自身位置，并得到新的状态。
+## Training Metrics
 
+以下指标来自 500-episode 训练记录；它们包含训练时的随机探索，与上表的单次 greedy 评估含义不同。
 
-2. 奖励函数设计（Reward Function）
+| 区间 | 平均 reward | 平均 steps | Success rate |
+| --- | ---: | ---: | ---: |
+| 前 50 episodes | -582.19 | 64.92 | 58% |
+| 后 50 episodes | 45.03 | 15.00 | 100% |
 
-当前采用基于距离的奖励：
+训练后期呈现 `reward ↑`、`steps ↓`、`success rate ↑` 的整体趋势。
 
-r = -d
+## 项目结构
 
-其中 d 为无人机当前位置与目标位置之间的欧氏距离。
+- `env/uav_env.py`：定义二维导航环境、状态转移、奖励与终止条件。
+- `agent/q_learning.py`：实现 Q-table、ε-greedy 动作选择和 Q-learning 更新。
+- `train.py`：执行训练并保存逐 episode 指标和 Q-table。
+- `test_policy.py`：在不探索、不学习的条件下评估 greedy policy。
+- `compare_training.py`：运行 100 vs 500 episodes 受控对比并保存评估结果与轨迹。
+- `visualize_training.py`：从训练 CSV 生成 reward、steps 和 success rate 曲线。
+- `animate_trajectories.py`：从轨迹 CSV 生成 100 vs 500 episodes 对比动画及终态图。
+- `results/`：保存 CSV、Q-table、PNG 曲线、轨迹 GIF 和终态图。
 
-距离目标越近，奖励越大。
+## 可视化
 
-当无人机到达目标区域时，给予额外正奖励：
+- [Reward curve](results/reward_curve_500_episodes_seed_0.png)：展示单回合 reward 与 50-episode 移动平均。
+- [Steps curve](results/steps_curve_500_episodes_seed_0.png)：展示单回合步数与 50-episode 移动平均。
+- [Success rate curve](results/success_rate_curve_500_episodes_seed_0.png)：展示 50-episode 滚动成功率。
+- [100 vs 500 trajectory GIF](results/trajectory_comparison_seed_0.gif)：直观对比 100 episodes 的振荡失败与 500 episodes 的 10 步成功轨迹。
 
-reward = 100
+## 当前结论与局限
 
+在 `seed=0` 的受控实验中，独立 100-episode 运行尚未形成成功的 greedy policy；同配置的独立 500-episode 运行训练到第 500 回合后，策略能够用最短的 10 步到达目标。
 
-3. Q-learning 控制器
-
-实现基于 Q-table 的强化学习智能体。
-
-Q值表示：
-
-Q(s,a)
-
-即在状态 s 下执行动作 a 的长期收益。
-
-通过不断与环境交互，根据奖励更新 Q-table：
-
-Q(s,a) ← Q(s,a)+α(r+γmaxQ(s',a')-Q(s,a))
-
-训练过程中，无人机通过探索不同动作逐渐形成移动策略。
-
-
-4. 训练与策略保存
-
-完成训练流程：
-
-环境初始化
-
-↓
-
-智能体选择动作
-
-↓
-
-无人机执行动作
-
-↓
-
-获得奖励
-
-↓
-
-更新Q值
-
-
-训练完成后，将Q-table保存为：
-
-q_table.pkl
-
-
-用于后续策略测试。
-
-
-## 当前实验结果
-
-训练过程能够观察到奖励逐渐出现正值，说明无人机已经能够在部分情况下学习到接近目标的移动策略。
-
-当前实验完成了强化学习控制流程的闭环验证：
-
-无人机环境 ✓
-
-状态设计 ✓
-
-动作设计 ✓
-
-奖励设计 ✓
-
-Q-learning更新 ✓
-
-策略保存 ✓
-
-
-## 当前问题
-
-目前策略测试中仍存在一定问题，例如：
-
-- 部分状态下出现左右振荡；
-- Q-learning在较小训练规模下收敛不稳定；
-- 状态空间和动作空间较简单。
-
-这些问题也是后续进一步研究复杂无人系统控制方法的基础。
-
-
-## 下一步计划
-
-后续将在当前实验基础上继续扩展：
-
-1. 优化单无人机控制模型；
-2. 理解连续系统与离散系统控制差异；
-3. 学习深度强化学习方法（DQN等）；
-4. 扩展到多无人机协同控制问题；
-5. 结合论文中的通信约束、全局训练局部执行等思想。
-
-
-## 文件结构
-
-uav_rl_learning/
-
-├── env/
-│   └── uav_env.py
-
-├── agent/
-│   └── q_learning.py
-
-├── train.py
-
-├── test_policy.py
-
-└── q_table.pkl
-
-
-
+当前 baseline 只描述二维离散位置，不包含速度、加速度、航向角或真实飞行动力学；只研究单 UAV，主要分析一个随机种子，且起点与目标固定。后续可开展 multi-seed 统计、随机起点/目标、DQN、UAV 动力学、多智能体协同、CTDE 以及 GNN/GAT；这些均为后续方向，尚未在当前版本中实现。

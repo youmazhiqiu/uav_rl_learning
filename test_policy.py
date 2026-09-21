@@ -1,72 +1,72 @@
-from env.uav_env import UAVEnv
-from agent.q_learning import QLearningAgent
+import argparse
+import math
 import pickle
+from pathlib import Path
+
+from agent.q_learning import QLearningAgent
+from env.uav_env import UAVEnv
 
 
+def evaluate_policy(env, agent):
+    """Run one greedy episode without learning and return evaluation results."""
+    # Evaluation has no exploration.
+    agent.epsilon = 0
 
-env = UAVEnv()
+    state = env.reset()
+    trajectory = [state.copy()]
+    total_reward = 0
+    steps = 0
 
+    while True:
+        # This method is deterministic and does not modify the Q-table.
+        action = agent.choose_greedy_action(state)
+        next_state, reward, done = env.step(action)
 
-agent = QLearningAgent()
+        total_reward += reward
+        steps += 1
+        state = next_state
+        trajectory.append(state.copy())
 
+        if done:
+            break
 
+    x, y, goal_x, goal_y = state
+    final_distance = math.sqrt((x - goal_x) ** 2 + (y - goal_y) ** 2)
+    success = final_distance < 1
 
-# 加载训练好的Q表
-
-with open("q_table.pkl","rb") as f:
-
-    agent.q_table = pickle.load(f)
-
-
-
-# 测试时不探索
-
-agent.epsilon = 0
-
-
-
-state = env.reset()
-
-
-print("start:", state)
-
-
-
-total_reward = 0
-
-
-
-while True:
-
-
-    action = agent.choose_action(state)
+    return {
+        "success": success,
+        "steps": steps,
+        "total_reward": total_reward,
+        "final_distance": final_distance,
+        "trajectory": trajectory,
+    }
 
 
-    next_state, reward, done = env.step(action)
+def load_q_table(agent, file_path):
+    """Load a saved Q-table into an agent."""
+    with Path(file_path).open("rb") as q_table_file:
+        agent.q_table = pickle.load(q_table_file)
 
 
+def main():
+    parser = argparse.ArgumentParser(description="Evaluate a learned UAV policy")
+    parser.add_argument("--q-table", default="q_table.pkl")
+    args = parser.parse_args()
 
-    print(
-        "state:",
-        state,
-        "action:",
-        action,
-        "reward:",
-        reward
-    )
+    env = UAVEnv()
+    agent = QLearningAgent(epsilon=0)
+    load_q_table(agent, args.q_table)
 
+    result = evaluate_policy(env, agent)
 
-
-    total_reward += reward
-
-
-    state = next_state
-
-
-    if done:
-
-        break
+    print("Evaluation complete")
+    print("Success:", result["success"])
+    print("Steps:", result["steps"])
+    print("Total reward:", round(result["total_reward"], 2))
+    print("Final distance:", round(result["final_distance"], 2))
+    print("Trajectory:", result["trajectory"])
 
 
-
-print("final reward:", total_reward)
+if __name__ == "__main__":
+    main()
